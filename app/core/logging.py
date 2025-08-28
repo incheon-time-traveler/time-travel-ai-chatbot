@@ -39,3 +39,4 @@ def setup_logging():
 def get_logger(name: str) -> logging.Logger:
     """지정된 이름의 로거를 반환합니다."""
     return logging.getLogger(name)
+
