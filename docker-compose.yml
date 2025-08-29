@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  chatbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    # 데이터만 컨테이너에 마운트 (코드 전체는 마운트하지 않음)
+    volumes:
+      - ./app/data:/chatbot/app/data
+    restart: unless-stopped
+    # Linux에서 host.docker.internal을 사용할 수 있도록 설정
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # locale을 UTF-8로 설정
+    environment:
+      - LANG=C.UTF-8
+      - LANGUAGE=C.UTF-8
+      - LC_ALL=C.UTF-8
+    
