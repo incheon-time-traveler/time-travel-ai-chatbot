@@ -53,8 +53,3 @@ class Settings(BaseSettings):
 
 # 전역 설정 인스턴스
 settings = Settings()
-
-# 환경 변수에서 설정 로드
-if os.path.exists(".env"):
-    settings = Settings(_env_file=".env")
-
