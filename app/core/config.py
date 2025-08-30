@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     # 서버 설정
     HOST: str = "0.0.0.0"
     PORT: int = 8000
-    DEBUG: bool = True
+    DEBUG: bool = False
     
     # CORS 설정
     ALLOWED_HOSTS: List[str] = ["*"]
