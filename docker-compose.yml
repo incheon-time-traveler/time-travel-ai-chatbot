@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --log-level info
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --log-level info
     env_file:
       - .env
     # 데이터만 컨테이너에 마운트 (코드 전체는 마운트하지 않음)
