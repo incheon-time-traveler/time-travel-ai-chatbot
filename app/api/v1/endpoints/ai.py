@@ -9,8 +9,7 @@ router = APIRouter()
 class ChatRequest(BaseModel):
     user_question: str
     user_id: str
-    user_lat: Optional[str] = None
-    user_lon: Optional[str] = None
+    user_location: Optional[dict] = None    # {"lat": ~~, "lng": ~~}
 
 class ChatResponse(BaseModel):
     ai_answer: str
@@ -18,7 +17,7 @@ class ChatResponse(BaseModel):
 @router.post("/chatbot", response_model=ChatResponse)
 async def chat(req: ChatRequest):
     try:
-        answer = await ask_ai(req.user_question, req.user_id, req.user_lat, req.user_lon)
+        answer = await ask_ai(req.user_question, req.user_id, req.user_location)
         return ChatResponse(ai_answer=answer)
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))

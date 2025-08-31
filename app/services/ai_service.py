@@ -16,7 +16,7 @@ async def get_or_create_graph():
     return _graph
 
 
-async def ask_ai(user_question: str, user_id: str, user_lat: Optional[str] = None, user_lon: Optional[str] = None) -> str:
+async def ask_ai(user_question: str, user_id: str, user_location: Optional[dict] = None) -> str:
     """
     Django views.chat_with_bot와 동일한 계약: 마지막 AI 메시지를 content로 반환.
     """
@@ -29,5 +29,17 @@ async def ask_ai(user_question: str, user_id: str, user_lat: Optional[str] = Non
     # 메시지에 GPS를 실어 보내고 싶다면 additional_kwargs를 활용하도록
     # graph_module의 analyze 노드에 이미 훅이 있으니 옵션으로 붙여도 됨 :contentReference[oaicite:4]{index=4}
     # 여기서는 최소 이식: content만 전달
-    result = await graph.ainvoke({"messages": [{"role": "user", "content": user_question}]}, config=config)
+    result = await graph.ainvoke(
+        {
+            "messages": [
+                {
+                    "role": "user", 
+                    "content": user_question,
+                    "additional_kwargs": {
+                        "user_lat": user_location["lat"],
+                        "user_lon": user_location["lng"]
+                    }
+                }
+            ]
+        }, config=config)
     return result["messages"][-1].content
