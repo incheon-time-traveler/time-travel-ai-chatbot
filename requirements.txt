@@ -30,3 +30,7 @@ langgraph>=0.6.6
 sentence-transformers>=3.0.0
 faiss-cpu>=1.8.0
 pyowm>=3.3.0
+
+# Sqlite
+Langgraph-checkpoint-sqlite>=2.0.11
+aiosqlite>=0.21.0

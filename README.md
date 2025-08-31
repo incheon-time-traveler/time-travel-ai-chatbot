@@ -19,6 +19,7 @@ time-travel-bot/
 │   ├── api/               # API 엔드포인트
 │   │   └── v1/           # API v1 버전
 │   │       ├── endpoints/ # API 엔드포인트 구현
+│   │       │   └── ai.py
 │   │       └── api.py     # API 라우터 통합
 │   ├── core/              # 핵심 설정 및 유틸리티
 │   │   ├── config.py      # 애플리케이션 설정
@@ -30,6 +31,8 @@ time-travel-bot/
 │   └── test_ai.py         # AI API 테스트
 ├── logs/                  # 로그 파일 (자동 생성)
 ├── requirements.txt       # Python 의존성 패키지
+├── Dockerfile             
+├── docker-compose.yml
 ├── env.example            # 환경 변수 설정 예시
 └── README.md              # 프로젝트 문서
 ```
@@ -40,6 +43,10 @@ time-travel-bot/
 
 ```bash
 pip install -r requirements.txt
+
+# 또는
+
+pip install requests beautifulsoup4 langchain langchain-core langchain-community langchain-chroma langchain-huggingface langchain-tavily langchain-openai langchain-upstage langgraph sentence-transformers pyowm faiss-cpu langgraph-checkpoint-sqlite aiosqlite
 ```
 
 ### 2. 환경 변수 설정
