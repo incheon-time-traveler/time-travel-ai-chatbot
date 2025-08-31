@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from app.api.v1.api import api_v1_router
+from app.api.v1.endpoints.ai import ChatRequest
 from app.services.ai_service import get_or_create_graph
 from app.core.config import settings
 
@@ -27,14 +28,25 @@ app.add_middleware(
 def health():
     return {"status": "ok"}
 
-@app.get(f"{settings.API_V1_STR}/chat")
-async def answer(user_question: str, user_id: str):
+@app.post(f"{settings.API_V1_STR}/chat")
+async def answer(req: ChatRequest):
     async def event_stream():
         graph = await get_or_create_graph()
-        config = {"configurable": {"thread_id": user_id}}
+        config = {"configurable": {"thread_id": req.user_id}}
         try:
             async for chunk in graph.astream(
-                input={"messages": [{"role": "user", "content": user_question}]},
+                input={
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": req.user_question,
+                            "additional_kwargs": {
+                                "user_lat": req.user_location["lat"],
+                                "user_lon": req.user_location["lng"]
+                            }
+                        }
+                    ]
+                },
                 config=config,
                 stream_mode=["messages"]
             ):
