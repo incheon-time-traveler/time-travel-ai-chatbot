@@ -72,18 +72,11 @@ def get_restroom_retriever():
         vector = None
         try:
             vector = FAISS.load_local(FAISS_DIR, emb, allow_dangerous_deserialization=True)
-        except Exception:
-            # 최초 배포 등 인덱스가 없을 때: CSV → 빌드 → 저장
-            loader = CSVLoader(
-                file_path=RESTROOM_CSV,
-                source_column="summary",
-                metadata_columns=["name", "address", "mapx", "mapy"],
-                encoding="utf-8",
+        except Exception as e:
+            raise RuntimeError(
+                f"Restroom FAISS index not found or incompatibale at '{FAISS_DIR}'. "
+                f"Pre-Build the index and copy both index.faiss/index.pkl. Original: {e}"
             )
-            docs = loader.load()
-            vector = FAISS.from_documents(docs, emb)
-            os.makedirs(FAISS_DIR, exist_ok=True)
-            vector.save_local(FAISS_DIR)
         _restroom_retriever = vector.as_retriever(
             search_type="similarity_score_threshold",
             search_kwargs={"score_threshold": 0.7, "k": 3},
