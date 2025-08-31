@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     # DATA
     DB_PATH: Optional[str] = None
     RESTROOM_CSV: Optional[str] = None
+    FAISS_DIR: Optional[str] = None
+    MEMORY_DB: Optional[str] = None
 
     # 임베딩 모델
     EMBEDDING_MODEL: Optional[str] = None

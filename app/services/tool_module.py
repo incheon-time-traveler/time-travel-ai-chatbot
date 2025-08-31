@@ -8,7 +8,7 @@ from app.core.config import settings
 
 from langchain.agents import Tool
 from langchain_core.tools import tool
-from langchain.tools.retriever import create_retriever_tool
+# from langchain.tools.retriever import create_retriever_tool
 from langchain_chroma import Chroma
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain_community.document_loaders import CSVLoader
@@ -32,37 +32,94 @@ KAKAO_MAP_URL = settings.KAKAO_MAP_URL
 DB_PATH = settings.DB_PATH
 RESTROOM_CSV = settings.RESTROOM_CSV
 EMBEDDING_MODEL = settings.EMBEDDING_MODEL
+FAISS_DIR = settings.FAISS_DIR    # 화장실 정보 FAISS
 
-# 임베딩 모델 설정
-hf_embeddings = HuggingFaceEmbeddings(
-    model_name=EMBEDDING_MODEL,
-    model_kwargs={"device": "cpu"},
-    encode_kwargs={"normalize_embeddings": True}
-)
+# Lazy Singletone 설정
+_embeddings = None
+_spot_retriever = None
+_restroom_retriever = None
 
-# 저장된 벡터 db 불러오기
-try:
-    spots_store = Chroma(
-        collection_name="spot_db",
-        embedding_function=hf_embeddings,
-        persist_directory=DB_PATH
-    )
+def get_embeddings():
+    global _embeddings
+    if _embeddings is None:
+        _embeddings = HuggingFaceEmbeddings(
+            model_name=EMBEDDING_MODEL,
+            model_kwargs={"device": "cpu"},
+            encode_kwargs={"normalize_embeddings": True},
+        )
+    return _embeddings
+
+def get_spot_retriever():
+    global _spot_retriever
+    if _spot_retriever is None:
+        emb = get_embeddings()
+        store = Chroma(
+            collection_name="spot_db",
+            embedding_function=emb,
+            persist_directory=DB_PATH,
+        )
+        _spot_retriever = store.as_retriever(
+            search_type="similarity_score_threshold",
+            search_kwargs={"score_threshold": 0.8, "k": 1},
+            )
+    return _spot_retriever
+
+def get_restroom_retriever():
+    """FAISS는 우선 load_local, 실패 시 CSV로 빌드 후 save_local."""
+    global _restroom_retriever
+    if _restroom_retriever is None:
+        emb = get_embeddings()
+        vector = None
+        try:
+            vector = FAISS.load_local(FAISS_DIR, emb, allow_dangerous_deserialization=True)
+        except Exception:
+            # 최초 배포 등 인덱스가 없을 때: CSV → 빌드 → 저장
+            loader = CSVLoader(
+                file_path=RESTROOM_CSV,
+                source_column="summary",
+                metadata_columns=["name", "address", "mapx", "mapy"],
+                encoding="utf-8",
+            )
+            docs = loader.load()
+            vector = FAISS.from_documents(docs, emb)
+            os.makedirs(FAISS_DIR, exist_ok=True)
+            vector.save_local(FAISS_DIR)
+        _restroom_retriever = vector.as_retriever(
+            search_type="similarity_score_threshold",
+            search_kwargs={"score_threshold": 0.7, "k": 3},
+        )
+    return _restroom_retriever
+
+# # 임베딩 모델 설정
+# hf_embeddings = HuggingFaceEmbeddings(
+#     model_name=EMBEDDING_MODEL,
+#     model_kwargs={"device": "cpu"},
+#     encode_kwargs={"normalize_embeddings": True}
+# )
+
+# # 저장된 벡터 db 불러오기
+# try:
+#     spots_store = Chroma(
+#         collection_name="spot_db",
+#         embedding_function=hf_embeddings,
+#         persist_directory=DB_PATH
+#     )
     
-    # retriever 설정
-    spot_retriever = spots_store.as_retriever(
-        search_type="similarity_score_threshold",
-        search_kwargs={"score_threshold": 0.8,    # 임계값 설정
-                       "k": 1},
-    )
+#     # retriever 설정
+#     spot_retriever = spots_store.as_retriever(
+#         search_type="similarity_score_threshold",
+#         search_kwargs={"score_threshold": 0.8,    # 임계값 설정
+#                        "k": 1},
+#     )
 
-    search_spot_tool_in_db = create_retriever_tool(
-        spot_retriever,
-        name="vectordb_search",
-        description="Use this tool to search information about Incheon's tour spots from the vector database."
-    )
-except Exception as e:
-    print(f"벡터DB 로딩 실패: {e}")
-    search_spot_tool_in_db = None
+#     search_spot_tool_in_db = create_retriever_tool(
+#         spot_retriever,
+#         name="vectordb_search",
+#         description="Use this tool to search information about Incheon's tour spots from the vector database."
+#     )
+# except Exception as e:
+#     print(f"벡터DB 로딩 실패: {e}")
+#     search_spot_tool_in_db = None
 
 # ===============[Tool]============================
 
@@ -267,6 +324,20 @@ def analyze_user_question(user_question: str, user_lat: str = None, user_lon: st
         "original_question": user_question
     }
 
+# vectordb tool
+@tool("vectordb_search")
+def search_spot_tool_in_db(query: str) -> list:
+    """Use this tool to search information about Incheon's tour spots from the vector database"""
+    retriever = get_spot_retriever()
+    docs = retriever.get_relevant_documents(query)
+    return [
+        {
+            "content": d.page_content,
+            "metadata": getattr(d, "metadata", {}),
+        }
+        for d in docs
+    ]
+
 # 2. tavily search tool
 search_tool_in_web = TavilySearch(
     max_results=5,
@@ -283,29 +354,43 @@ open_weather_map = Tool(
     description="Use this tool to search weather information for a given location."
 )
 
-# 4. 공공화장실
-loader = CSVLoader(
-    file_path=RESTROOM_CSV,
-    source_column="summary",
-    metadata_columns=["name", "address", "mapx", "mapy"],
-    encoding="utf-8",
-)
+# 공공화장실
+@tool("restroom_search")
+def restroom_tool(query: str) -> list:
+    """Use this tool to search the restroom information from CSV loader."""
+    retriever = get_restroom_retriever()
+    docs = retriever.get_relevant_documents(query)
+    return [
+        {
+            "content": d.page_content,
+            "metadata": getattr(d, "metadata", {}),
+        }
+        for d in docs
+    ]
 
-restroom_data = loader.load()
+# # 4. 공공화장실
+# loader = CSVLoader(
+#     file_path=RESTROOM_CSV,
+#     source_column="summary",
+#     metadata_columns=["name", "address", "mapx", "mapy"],
+#     encoding="utf-8",
+# )
 
-vector = FAISS.from_documents(restroom_data, hf_embeddings)
+# restroom_data = loader.load()
 
-restroom_retriever = vector.as_retriever(
-    search_type="similarity_score_threshold",
-    search_kwargs={"score_threshold": 0.7,    # 임계값 설정
-                   "k": 3},
-)
+# vector = FAISS.from_documents(restroom_data, hf_embeddings)
 
-restroom_tool = create_retriever_tool(
-    restroom_retriever,
-    name="restroom_search",    # 도구 이름 입력
-    description="Use this tool to search the restroom information from CSV loader.",
-)
+# restroom_retriever = vector.as_retriever(
+#     search_type="similarity_score_threshold",
+#     search_kwargs={"score_threshold": 0.7,    # 임계값 설정
+#                    "k": 3},
+# )
+
+# restroom_tool = create_retriever_tool(
+#     restroom_retriever,
+#     name="restroom_search",    # 도구 이름 입력
+#     description="Use this tool to search the restroom information from CSV loader.",
+# )
 
 # 5. 카페 추천 tool
 @tool

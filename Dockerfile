@@ -10,7 +10,9 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
 # 애플리케이션 전체 복사 (run.py 포함)
-COPY . .
+COPY app /chatbot/app
 
 EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 

@@ -18,7 +18,7 @@ class ChatResponse(BaseModel):
 @router.post("/chatbot", response_model=ChatResponse)
 async def chat(req: ChatRequest):
     try:
-        answer = ask_ai(req.user_question, req.user_id, req.user_lat, req.user_lon)
+        answer = await ask_ai(req.user_question, req.user_id, req.user_lat, req.user_lon)
         return ChatResponse(ai_answer=answer)
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
