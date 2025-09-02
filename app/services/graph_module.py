@@ -2,22 +2,35 @@
 import os
 
 from app.core.config import settings
+from app.services.state import State
+from app.services.tool_module import *
 
 from langchain_openai import ChatOpenAI
 from langchain_upstage import ChatUpstage
 from langchain_core.messages import AIMessage, ToolMessage, HumanMessage
 
-from typing import Annotated, TypedDict
 from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
-from langgraph.checkpoint.memory import MemorySaver
+# from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-from app.services.tool_module import *
+from contextlib import AsyncExitStack
 
 # 환경 변수 설정
 os.environ["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
 os.environ["UPSTAGE_API_KEY"] = settings.UPSTAGE_API_KEY
+MEMORY_DB = settings.MEMORY_DB
+
+_async_exit_stack = AsyncExitStack()
+_CHECKPOINTER = None
+
+async def _ensure_checkpointer():
+    global _CHECKPOINTER
+    if _CHECKPOINTER is None:
+        _CHECKPOINTER = await _async_exit_stack.enter_async_context(
+            AsyncSqliteSaver.from_conn_string(MEMORY_DB)
+        )
+    return _CHECKPOINTER
 
 # LLM 정의 - 인천 토박이 친구 페르소나 설정
 def get_llm(company_name):
@@ -33,13 +46,6 @@ def get_llm(company_name):
             temperature=0.3,
         )
     return llm
-
-# 상태 정의
-class State(TypedDict):
-    # 메시지 정의하기
-    messages: Annotated[list, add_messages]
-    question_analysis: dict  # 질문 분석 결과
-    current_step: str  # 현재 처리 단계
 
 
 # 도구 목록
@@ -113,7 +119,7 @@ def _has_unresolved_tool_calls(messages: list) -> bool:
 # 챗봇 함수 정의 - 인천 토박이 친구 페르소나 적용
 async def chatbot(state: State):
     # 시스템 메시지에 페르소나 설정
-    system_message = """너는 인천 토박이인 친한 친구야! 반말과 친근감 있는 말투로 대화해줘.
+    system_message = """너는 인천 토박이인 사용자와 아주 친한 친구야! 반말과 친근감 있는 말투로 대화해줘.
     
     사용자의 질문을 분석해서 적절한 도구를 사용해서 답변해줘:
     1. 인천 관광지 관련 질문이면 벡터DB를 먼저 검색해
@@ -204,7 +210,7 @@ def _after_tools_router(state):
 
 
 # 그래프 생성 함수
-def make_graph():
+async def make_graph():
 
     graph_builder = StateGraph(State)
     
@@ -238,13 +244,19 @@ def make_graph():
         {"tools": "tools", "chatbot": "chatbot"}
     )
 
-    # 대화 내용 기억 tool
-    memory = MemorySaver()
+    # # 대화 내용 기억 tool
+    # memory = MemorySaver()
+    # 체크포인터를 SQLite 파일로 -> EC2 디스크에 생성
+    # 파일 경로를 환경/설정에 맞게 변경 가능함.
+    checkpointer = await _ensure_checkpointer()
     
     # 컴파일
     graph = \
     graph_builder.compile(
-        checkpointer=memory,
+        checkpointer=checkpointer,
     )
 
     return graph
+
+async def aclose_checkpointer():
+    await _async_exit_stack.close()

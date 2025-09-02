@@ -19,6 +19,7 @@ time-travel-bot/
 │   ├── api/               # API 엔드포인트
 │   │   └── v1/           # API v1 버전
 │   │       ├── endpoints/ # API 엔드포인트 구현
+│   │       │   └── ai.py
 │   │       └── api.py     # API 라우터 통합
 │   ├── core/              # 핵심 설정 및 유틸리티
 │   │   ├── config.py      # 애플리케이션 설정
@@ -30,6 +31,8 @@ time-travel-bot/
 │   └── test_ai.py         # AI API 테스트
 ├── logs/                  # 로그 파일 (자동 생성)
 ├── requirements.txt       # Python 의존성 패키지
+├── Dockerfile             
+├── docker-compose.yml
 ├── env.example            # 환경 변수 설정 예시
 └── README.md              # 프로젝트 문서
 ```
@@ -40,6 +43,10 @@ time-travel-bot/
 
 ```bash
 pip install -r requirements.txt
+
+# 또는
+
+pip install requests beautifulsoup4 langchain langchain-core langchain-community langchain-chroma langchain-huggingface langchain-tavily langchain-openai langchain-upstage langgraph sentence-transformers pyowm faiss-cpu langgraph-checkpoint-sqlite aiosqlite
 ```
 
 ### 2. 환경 변수 설정
@@ -91,11 +98,6 @@ pytest -v
 2. `app/api/v1/api.py`에 새 라우터 등록
 3. 필요한 경우 `app/services/`에 비즈니스 로직 추가
 
-### 새로운 데이터 모델 추가
-
-1. `app/models/` 디렉토리에 새로운 모델 파일 생성
-2. `app/database/session.py`의 `init_db()` 함수에 모델 import 추가
-
 ### 환경 변수 추가
 
 1. `app/core/config.py`의 `Settings` 클래스에 새 설정 추가
@@ -104,8 +106,6 @@ pytest -v
 ## 📝 TODO
 
 - [ ] 실제 AI 모델 연동 (OpenAI, Hugging Face 등)
-- [ ] 데이터베이스 마이그레이션 (Alembic)
-- [ ] 사용자 권한 관리 시스템
 - [ ] API 요청/응답 캐싱
 - [ ] 모니터링 및 메트릭 수집
 - [ ] Docker 컨테이너화

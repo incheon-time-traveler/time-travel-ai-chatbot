@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     # 서버 설정
     HOST: str = "0.0.0.0"
     PORT: int = 8000
-    DEBUG: bool = True
+    DEBUG: bool = False
     
     # CORS 설정
     ALLOWED_HOSTS: List[str] = ["*"]
@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     # DATA
     DB_PATH: Optional[str] = None
     RESTROOM_CSV: Optional[str] = None
+    FAISS_DIR: Optional[str] = None
+    MEMORY_DB: Optional[str] = None
 
     # 임베딩 모델
     EMBEDDING_MODEL: Optional[str] = None
@@ -53,8 +55,3 @@ class Settings(BaseSettings):
 
 # 전역 설정 인스턴스
 settings = Settings()
-
-# 환경 변수에서 설정 로드
-if os.path.exists(".env"):
-    settings = Settings(_env_file=".env")
-
