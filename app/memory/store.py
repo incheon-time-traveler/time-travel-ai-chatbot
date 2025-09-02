@@ -1,11 +1,12 @@
 # thread_id 단위 삭제/조회/통계
 # aiosqlite 직접 접근
 import os
-import re
+import asyncio
 from typing import List, Tuple
 
 import aiosqlite
 from app.core.config import settings
+from app.memory.locks import thread_lock
 
 MEMORY_DB = settings.MEMORY_DB
 CANDIDATE_THREAD_COLS = ["thread_id", "parent_thread_id", "source_thread_id"]
@@ -69,22 +70,22 @@ async def delete_thread(thread_id: str) -> int:
         return 0
     
     deleted_total = 0
-    async with aiosqlite.connect(MEMORY_DB) as db:
-        await db.execute("PRAGMA foreign_keys=ON;")
-        # thread id 관련 컬럼 후보 (버전에 따라 다를 수 있어 넉넉히 포함)
-        candidate_cols = ["thread_id", "parent_thread_id", "source_thread_id"]
 
-        targets = await tables_with_any_of(db, candidate_cols)
-        for table, cols in targets:
-            where = " OR ".join([f"{c} = ?" for c in cols])
-            params = [thread_id] * len(cols)
-            cur = await db.execute(f"DELETE FROM {table} WHERE {where};", params)
-            deleted_total += int(cur.rowcount or 0)
+    # thread_id 단위 직렬화
+    async with thread_lock(thread_id):
+        async with aiosqlite.connect(MEMORY_DB) as db:
+            await db.execute("PRAGMA foreign_keys=ON;")
+            # thread id 관련 컬럼 후보 (버전에 따라 다를 수 있어 넉넉히 포함)
+            candidate_cols = ["thread_id", "parent_thread_id", "source_thread_id"]
+
+            targets = await tables_with_any_of(db, candidate_cols)
+            for table, cols in targets:
+                where = " OR ".join([f"{c} = ?" for c in cols])
+                params = [thread_id] * len(cols)
+                cur = await db.execute(f"DELETE FROM {table} WHERE {where};", params)
+                deleted_total += int(cur.rowcount or 0)
             
-        # WAL 체크포인트/공간 회수(선택이지만 권장)
-        await db.execute("PRAGMA wal_checkpoint(TRUNCATE);")
-        await db.execute("VACUUM;")
-        await db.commit()
+            await db.commit()
 
     return deleted_total
 
