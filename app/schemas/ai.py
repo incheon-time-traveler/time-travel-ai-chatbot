@@ -2,8 +2,8 @@ from pydantic import BaseModel
 from typing import Optional
 
 class UserLocation(BaseModel):
-    lat: float
-    lng: float
+    lat: Optional[float] = None
+    lng: Optional[float] = None
 
 class ChatRequest(BaseModel):
     user_question: str

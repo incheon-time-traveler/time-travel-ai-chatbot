@@ -43,8 +43,8 @@ async def answer(req: ChatRequest):
                             "role": "user",
                             "content": req.user_question,
                             "additional_kwargs": {
-                                "user_lat": req.user_location["lat"],
-                                "user_lon": req.user_location["lng"]
+                                "user_lat": req.user_location.lat,
+                                "user_lon": req.user_location.lng
                             }
                         }
                     ]
