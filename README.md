@@ -5,11 +5,9 @@ FastAPI를 사용하여 구축된 AI 서버 애플리케이션입니다.
 ## 🚀 주요 기능
 
 - **AI 텍스트 생성**: 다양한 AI 모델을 통한 텍스트 생성
-- **사용자 인증**: JWT 기반 사용자 인증 및 권한 관리
 - **RESTful API**: 표준 REST API 엔드포인트 제공
 - **자동 문서화**: Swagger UI를 통한 API 문서 자동 생성
 - **로깅 시스템**: 체계적인 로깅 및 모니터링
-- **데이터베이스 연동**: SQLAlchemy를 통한 데이터베이스 관리
 
 ## 📁 프로젝트 구조
 
@@ -76,6 +74,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ### AI 관련
 - `POST /v1/chatbot` - AI 텍스트 생성
+- `POST /v1/chat` - AI 텍스트 생성 (stream)
 
 ## 🧪 테스트 실행
 
@@ -105,10 +104,10 @@ pytest -v
 
 ## 📝 TODO
 
-- [ ] 실제 AI 모델 연동 (OpenAI, Hugging Face 등)
-- [ ] API 요청/응답 캐싱
-- [ ] 모니터링 및 메트릭 수집
-- [ ] Docker 컨테이너화
+- [x] 실제 AI 모델 연동 (OpenAI, Hugging Face 등)
+- [x] API 요청/응답 캐싱
+- [x] 모니터링 및 메트릭 수집
+- [x] Docker 컨테이너화
 - [ ] CI/CD 파이프라인 구축
 
 ## 🤝 기여하기

@@ -1,0 +1,52 @@
+name: CI/CD - FastAPI Docker Deploy
+
+on:
+  push:
+    branches: [ master ]
+  
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v3
+      
+      - name: Deploy FastAPI to EC2 via SSH (Docker)
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e # 오류 발생시 멈춤
+            cd /home/ubuntu/time-travel-ai-chatbot
+
+            echo "Pull latest code"
+            git pull origin master
+
+            echo "Build & Run"
+            docker compose build --pull
+            docker compose up -d
+
+            echo "Health check"
+            sleep 3
+            docker compose ps
+
+            # 내부 헬스엔드포인트가 있으면:
+            ATTEMPTS=5
+            until curl -sf http://localhost:8000/health > /dev/null || [ $ATTEMPTS -le 0 ]; do
+              ATTEMPTS=$((ATTEMPTS-1))
+              echo " - waiting for app... ($ATTEMPTS)"
+              sleep 3
+            done
+
+            if [ $ATTEMPTS -le 0 ]; then
+              echo "❌ health check failed"
+              docker compose ps
+              docker compose logs --tail=200
+              exit 1
+            fi
+            
+            echo "✅ Done"
+            
