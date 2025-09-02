@@ -18,7 +18,7 @@ async def chat(req: ChatRequest):
     챗봇이 답변을 한번에 제공함.
     """
     try:
-        answer = await ask_ai(req.user_question, req.user_id, req.user_location)
+        answer = await ask_ai(req)
         return ChatResponse(ai_answer=answer)
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
@@ -28,6 +28,7 @@ async def chat(req: ChatRequest):
 @router.post("/chat")
 async def answer(req: ChatRequest):
     """
+    챗봇이 답변을 stream으로 제공함.
     - checkpoint_id : 매 요청마다 uuid4()로 부여 (동시 런 충돌 완화)
     """
     checkpoint_id = str(uuid4())
