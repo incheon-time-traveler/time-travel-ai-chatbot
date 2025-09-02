@@ -1,17 +1,36 @@
-name: Sync fork when master is updated
+name: Sync fork with upstream
 
 on:
-  push:
-    branches: [ master ]
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
 
 jobs:
-  sync-fork:
+  sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Call GitHub API - merge-upstream to fork
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.FORK_PAT }}
+          fetch-depth: 0
+      
+      - name: Add upstream remote
         run: |
-          curl -sS -X POST \
-            -H "Authorization: token ${{ secrets.FORK_PAT }}" \
-            -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/<fork_owner>/<fork_repo>/merge-upstream \
-            -d '{"branch":"master"}'
+          git remote add upstream https://github.com/incheon-time-traveler/time-travel-ai-chatbot.git
+          git fetch upstream
+
+      - name: Merge upstream changes
+        run: |
+          git checkout master
+          git merge upstream/master
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.FORK_PAT }}
+          commit-messages: "Sync fork with upstream"
+          title: "Sync fork with upstream"
+          body: "자동 생성된 PR: upstream/master -> fork/master"
+          branch: sync-upstream/master
+          base: master
