@@ -2,6 +2,7 @@
 import os
 
 from app.core.config import settings
+from app.memory.manager import ensure_checkpointer
 from app.services.state import State
 from app.services.tool_module import *
 
@@ -11,26 +12,12 @@ from langchain_core.messages import AIMessage, ToolMessage, HumanMessage
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
-# from langgraph.checkpoint.memory import MemorySaver
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-from contextlib import AsyncExitStack
 
 # 환경 변수 설정
 os.environ["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
 os.environ["UPSTAGE_API_KEY"] = settings.UPSTAGE_API_KEY
-MEMORY_DB = settings.MEMORY_DB
 
-_async_exit_stack = AsyncExitStack()
-_CHECKPOINTER = None
-
-async def _ensure_checkpointer():
-    global _CHECKPOINTER
-    if _CHECKPOINTER is None:
-        _CHECKPOINTER = await _async_exit_stack.enter_async_context(
-            AsyncSqliteSaver.from_conn_string(MEMORY_DB)
-        )
-    return _CHECKPOINTER
 
 # LLM 정의 - 인천 토박이 친구 페르소나 설정
 def get_llm(company_name):
@@ -106,7 +93,7 @@ async def analyze_question_node(state: State):
         "current_step": "no_analysis_needed"
     }
 
-def _has_unresolved_tool_calls(messages: list) -> bool:
+def has_unresolved_tool_calls(messages: list) -> bool:
     """마지막 ToolMessage가 나오기 전에 tool_calls가 있으면 True"""
     # 뒤에서 앞으로 훑으며 ToolMessage를 만나면 해결된 상태로 간주
     for m in reversed(messages):
@@ -140,7 +127,7 @@ async def chatbot(state: State):
 
     항상 친근하고 반말로 대화해줘!"""
 
-    if _has_unresolved_tool_calls(state["messages"]):
+    if has_unresolved_tool_calls(state["messages"]):
         return {}    # 상태 변경 없이 다음 노드로
     
     # 시스템 메시지 추가
@@ -157,7 +144,7 @@ async def chatbot(state: State):
     return {"messages": [response]}
 
 
-def _called_tool(state: State, name: str) -> bool:
+def called_tool(state: State, name: str) -> bool:
     for m in reversed(state["messages"]):
         if isinstance(m, ToolMessage):
             # 버전에 따라 name/tool_name 속성 다를 수 있기 때문에 둘다 확인
@@ -166,7 +153,7 @@ def _called_tool(state: State, name: str) -> bool:
     return False
 
 
-def _dump_tool_names(messages, last_n: int = 10):
+def dump_tool_names(messages, last_n: int = 10):
     names = []
     for message in messages:
         if isinstance(message, ToolMessage):
@@ -178,7 +165,7 @@ def _dump_tool_names(messages, last_n: int = 10):
 def select_next_node(state: State):
 
     # 최근 어떤 ToolMessage가 붙었는지
-    _dump_tool_names(state.get("messages", []))
+    dump_tool_names(state.get("messages", []))
     
     # 질문 분석이 되지 않았다면
     if "question_analysis" not in state or not state["question_analysis"]:
@@ -191,13 +178,13 @@ def select_next_node(state: State):
 
     # 길찾기 인텐트(route=True)면 바로 tools 실행
     if qa_types.get("route"):
-        if _called_tool(state, "build_kakaomap_route"):
+        if called_tool(state, "build_kakaomap_route"):
             return END
         return "tools"
     
     # 화장실 우선 처리
     if qa_types.get("restroom"):
-        if _called_tool(state, "restroom_search"):
+        if called_tool(state, "restroom_search"):
             return END
         return "tools"
 
@@ -205,8 +192,8 @@ def select_next_node(state: State):
     return tools_condition(state)
 
 
-def _after_tools_router(state):
-    return "tools" if _has_unresolved_tool_calls(state.get("messages", [])) else "chatbot"
+def after_tools_router(state):
+    return "tools" if has_unresolved_tool_calls(state.get("messages", [])) else "chatbot"
 
 
 # 그래프 생성 함수
@@ -240,7 +227,7 @@ async def make_graph():
     # graph_builder.add_edge("tools", _after_tools_router)
     graph_builder.add_conditional_edges(
         "tools",
-        _after_tools_router,
+        after_tools_router,
         {"tools": "tools", "chatbot": "chatbot"}
     )
 
@@ -248,7 +235,7 @@ async def make_graph():
     # memory = MemorySaver()
     # 체크포인터를 SQLite 파일로 -> EC2 디스크에 생성
     # 파일 경로를 환경/설정에 맞게 변경 가능함.
-    checkpointer = await _ensure_checkpointer()
+    checkpointer = await ensure_checkpointer()
     
     # 컴파일
     graph = \
@@ -257,6 +244,3 @@ async def make_graph():
     )
 
     return graph
-
-async def aclose_checkpointer():
-    await _async_exit_stack.close()

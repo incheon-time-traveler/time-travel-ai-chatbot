@@ -1,0 +1,17 @@
+name: Sync fork when master is updated
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  sync-fork:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call GitHub API - merge-upstream to fork
+        run: |
+          curl -sS -X POST \
+            -H "Authorization: token ${{ secrets.FORK_PAT }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/<fork_owner>/<fork_repo>/merge-upstream \
+            -d '{"branch":"master"}'
