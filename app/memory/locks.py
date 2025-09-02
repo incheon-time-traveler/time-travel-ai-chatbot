@@ -10,7 +10,9 @@ lock_store: Dict[str, asyncio.Lock] = {}
 
 def thread_key(thread_id: str) -> str:
     """내부 저장소에서 사용할 네임스페이스가 붙은 키"""
-    return f"thread: {thread_id}"
+    if not thread_id:
+        raise ValueError("thread_id required")
+    return f"thread:{thread_id}"
 
 
 def get_lock(key: str) -> asyncio.Lock:
@@ -92,3 +94,36 @@ def cleanup_thread_lock(thread_id: str) -> bool:
         del lock_store[key]
         return True
     return False
+
+cancel_store: Dict[str, asyncio.Event] = {}
+
+def get_cancel_event(thread_id: str) -> asyncio.Event:
+    key = thread_key(thread_id)
+    evt = cancel_store.get(key)
+    if evt is None:
+        evt = asyncio.Event()
+        cancel_store[key] = evt
+    return evt
+
+def request_cancel(thread_id: str) -> None:
+    """해당 thread_id의 실행 루프에게 '중단' 신호를 보냄"""
+    get_cancel_event(thread_id).set()
+
+def clear_cancel(thread_id: str) -> None:
+    """다음 실행을 위해 취소 플래그를 초기화"""
+    key = thread_key(thread_id)
+    evt = cancel_store.get(key)
+    if evt:
+        evt.clear()
+
+async def wait_until_unlocked(thread_id: str, timeout: float = 5.0) -> bool:
+    """락이 풀릴 때까지 최대 timeout초 대기"""
+    key = thread_key(thread_id)
+    lock = lock_store.get(key)
+    if not lock or not lock.locked():
+        return True
+    loop = asyncio.get_event_loop()
+    deadline = loop.time() + timeout
+    while lock.locked() and loop.time() < deadline:
+        await asyncio.sleep(0.05)
+    return not lock.locked()

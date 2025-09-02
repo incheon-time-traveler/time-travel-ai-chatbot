@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query
-from app.memory.locks import thread_lock
+from app.memory.locks import thread_lock, try_acquire_thread, release_thread, request_cancel, wait_until_unlocked
 from app.memory.store import delete_thread, has_thread, find_thread, list_threads
 
 from typing import List
@@ -7,14 +7,21 @@ from typing import List
 router = APIRouter()
 
 @router.delete("")
-async def delete_memory(thread_id: str):
-    try:
+async def delete_memory(
+    thread_id: str,
+    force: bool = Query(False, description="실행 중이어도 강제 종료 후 삭제")
+):
+    if not force:
         async with thread_lock(thread_id):
             deleted = await delete_thread(thread_id)
         return {"user_id": thread_id, "deleted_rows": deleted}
-    # 에러 찾기
-    except Exception as e:
-        return {"errer": str(e)}
+    
+    if await try_acquire_thread(thread_id, timeout=10):
+        try:
+            deleted = await delete_thread(thread_id)
+            return {"thread_id": thread_id, "deleted_rows": deleted, "forced":True}
+        finally:
+            release_thread(thread_id)
     
 @router.get("/exists")
 async def thread_exists(thread_id: str):
