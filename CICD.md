@@ -27,3 +27,8 @@ sudo docker compose ps
 
 sudo docker compose logs -f
 ```
+
+## HTTPS 관련
+
+- 인증서를 받아야 함.
+- nginx 사용
