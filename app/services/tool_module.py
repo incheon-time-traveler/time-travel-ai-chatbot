@@ -8,10 +8,8 @@ from app.core.config import settings
 
 from langchain.agents import Tool
 from langchain_core.tools import tool
-# from langchain.tools.retriever import create_retriever_tool
 from langchain_chroma import Chroma
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
-from langchain_community.document_loaders import CSVLoader
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_community.vectorstores import FAISS
 from langchain_tavily import TavilySearch
@@ -82,37 +80,6 @@ def get_restroom_retriever():
             search_kwargs={"score_threshold": 0.7, "k": 3},
         )
     return _restroom_retriever
-
-# # 임베딩 모델 설정
-# hf_embeddings = HuggingFaceEmbeddings(
-#     model_name=EMBEDDING_MODEL,
-#     model_kwargs={"device": "cpu"},
-#     encode_kwargs={"normalize_embeddings": True}
-# )
-
-# # 저장된 벡터 db 불러오기
-# try:
-#     spots_store = Chroma(
-#         collection_name="spot_db",
-#         embedding_function=hf_embeddings,
-#         persist_directory=DB_PATH
-#     )
-    
-#     # retriever 설정
-#     spot_retriever = spots_store.as_retriever(
-#         search_type="similarity_score_threshold",
-#         search_kwargs={"score_threshold": 0.8,    # 임계값 설정
-#                        "k": 1},
-#     )
-
-#     search_spot_tool_in_db = create_retriever_tool(
-#         spot_retriever,
-#         name="vectordb_search",
-#         description="Use this tool to search information about Incheon's tour spots from the vector database."
-#     )
-# except Exception as e:
-#     print(f"벡터DB 로딩 실패: {e}")
-#     search_spot_tool_in_db = None
 
 # ===============[Tool]============================
 
@@ -186,7 +153,9 @@ def analyze_user_question(user_question: str, user_lat: str = None, user_lon: st
             for pattern in location_patterns:
                 match = re.search(pattern, user_question)
                 if match:
-                    extracted_info["location"] = match.group(1)
+                    # 구체적인 장소명이 있으면 query를 해당 장소명으로, location은 None으로 설정
+                    extracted_info["query"] = match.group(1)
+                    extracted_info["location"] = None
                     extracted_info["location_type"] = "specific_place"  # 특정 장소
                     location_found = True
                     break
@@ -233,7 +202,9 @@ def analyze_user_question(user_question: str, user_lat: str = None, user_lon: st
             for pattern in location_patterns:
                 match = re.search(pattern, user_question)
                 if match:
-                    extracted_info["location"] = match.group(1)
+                    # 구체적인 장소명이 있으면 query를 해당 장소명으로, location은 None으로 설정
+                    extracted_info["query"] = match.group(1)
+                    extracted_info["location"] = None
                     extracted_info["location_type"] = "specific_place"  # 특정 장소
                     location_found = True
                     break
@@ -361,29 +332,6 @@ def restroom_tool(query: str) -> list:
         for d in docs
     ]
 
-# # 4. 공공화장실
-# loader = CSVLoader(
-#     file_path=RESTROOM_CSV,
-#     source_column="summary",
-#     metadata_columns=["name", "address", "mapx", "mapy"],
-#     encoding="utf-8",
-# )
-
-# restroom_data = loader.load()
-
-# vector = FAISS.from_documents(restroom_data, hf_embeddings)
-
-# restroom_retriever = vector.as_retriever(
-#     search_type="similarity_score_threshold",
-#     search_kwargs={"score_threshold": 0.7,    # 임계값 설정
-#                    "k": 3},
-# )
-
-# restroom_tool = create_retriever_tool(
-#     restroom_retriever,
-#     name="restroom_search",    # 도구 이름 입력
-#     description="Use this tool to search the restroom information from CSV loader.",
-# )
 
 # 5. 카페 추천 tool
 @tool
@@ -399,6 +347,9 @@ def get_near_cafe_in_kakao(query: str, location: str = None, latitude: str = Non
     search_query = query
     if location:
         search_query = f"{location} {query}"
+    else:
+        # location이 없으면 인천으로 고정
+        search_query = f"인천 {query}"
     
     params = {
         "query": search_query,
@@ -456,6 +407,9 @@ def get_near_restaurant_in_kakao(query: str, location: str = None, latitude: str
     search_query = query
     if location:
         search_query = f"{location} {query}"
+    else:
+        # location이 없으면 인천으로 고정
+        search_query = f"인천 {query}"
     
     params = {
         "query": search_query,
