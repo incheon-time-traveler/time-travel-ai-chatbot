@@ -9,8 +9,10 @@ WORKDIR /chatbot
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
-# 애플리케이션 전체 복사 (run.py 포함)
+# 애플리케이션 전체 복사
 COPY app /chatbot/app
+# data 폴더 따로 복사하기
+COPY data /chatbot/data
 
 EXPOSE 8000
 
