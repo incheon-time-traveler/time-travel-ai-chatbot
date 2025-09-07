@@ -13,26 +13,29 @@ FastAPI를 사용하여 구축된 AI 서버 애플리케이션입니다.
 
 ```
 time-travel-bot/
-├── app/                    # 메인 애플리케이션 패키지
-│   ├── api/               # API 엔드포인트
-│   │   └── v1/           # API v1 버전
-│   │       ├── endpoints/ # API 엔드포인트 구현
-│   │       │   └── ai.py
-│   │       └── api.py     # API 라우터 통합
-│   ├── core/              # 핵심 설정 및 유틸리티
-│   │   ├── config.py      # 애플리케이션 설정
-│   │   └── logging.py     # 로깅 설정
-│   ├── services/          # 비즈니스 로직 서비스
-│   │   └── ai_service.py  # AI 서비스 로직
-│   └── main.py            # 애플리케이션 진입점
-├── tests/                 # 테스트 코드
-│   └── test_ai.py         # AI API 테스트
-├── logs/                  # 로그 파일 (자동 생성)
-├── requirements.txt       # Python 의존성 패키지
+├── app/                           # 메인 애플리케이션 패키지
+│   ├── api/                       # API 엔드포인트
+│   │   └── v1/                    # API v1 버전
+│   │       ├── endpoints/         # API 엔드포인트 구현
+│   │       │   ├── ai.py
+│   │       │   └── memory.py
+│   │       └── routers.py         # API 라우터 통합
+│   ├── core/                      # 핵심 설정 및 유틸리티
+│   │   ├── config.py              # 애플리케이션 설정
+│   │   └── logging.py             # 로깅 설정
+│   ├── schemas/                   # 스키마 모음
+│   │   └── ai.py
+│   ├── services/                  # 비즈니스 로직 서비스
+│   │   └── ai_service.py          # AI 서비스 로직
+│   └── main.py                    # 애플리케이션 진입점
+├── tests/                         # 테스트 코드
+│   └── test_ai.py                 # AI API 테스트
+├── logs/                          # 로그 파일 (자동 생성)
+├── requirements.txt               # Python 의존성 패키지
 ├── Dockerfile             
 ├── docker-compose.yml
-├── env.example            # 환경 변수 설정 예시
-└── README.md              # 프로젝트 문서
+├── env.example                    # 환경 변수 설정 예시
+└── README.md                      # 프로젝트 문서
 ```
 
 ## 🛠️ 설치 및 실행
@@ -59,6 +62,9 @@ cp env.example .env
 ```bash
 # 개발 모드로 실행
 python -m app.main
+
+# 또는 uv로 실행
+uv run -m app.main
 
 # 또는 uvicorn을 직접 사용
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -108,7 +114,7 @@ pytest -v
 - [x] API 요청/응답 캐싱
 - [x] 모니터링 및 메트릭 수집
 - [x] Docker 컨테이너화
-- [ ] CI/CD 파이프라인 구축
+- [X] CI/CD 파이프라인 구축
 
 ## 🤝 기여하기
 
