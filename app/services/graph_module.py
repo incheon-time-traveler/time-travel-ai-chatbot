@@ -2,6 +2,7 @@
 import os
 
 from app.core.config import settings
+from app.core.logging import get_logger
 from app.memory.manager import ensure_checkpointer
 from app.services.state import State
 from app.services.tool_module import *
@@ -13,6 +14,8 @@ from langchain_core.messages import AIMessage, ToolMessage, HumanMessage
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
 
+# 로거 설정
+logger = get_logger(__name__)
 
 # 환경 변수 설정
 os.environ["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
@@ -133,9 +136,11 @@ async def chatbot(state: State):
     response = await llm_with_tools.ainvoke(messages_with_system)
 
     # 디버깅
-    print(f"[DEBUG] LLM 응답: {response}")
+    # print(f"[DEBUG] LLM 응답: {response}")
+    logger.info(f"[DEBUG] LLM 응답: {response}")
     if hasattr(response, 'tool_calls') and response.tool_calls:
-        print(f"[DEBUG] 도구 호출 감지: {response.tool_calls}")
+        # print(f"[DEBUG] 도구 호출 감지: {response.tool_calls}")
+        logger.info(f"[DEBUG] 도구 호출 감지: {response.tool_calls}")
 
     # 메시지 호출 및 반환
     return {"messages": [response]}
@@ -155,7 +160,8 @@ def dump_tool_names(messages, last_n: int = 10):
     for message in messages:
         if isinstance(message, ToolMessage):
             names.append(getattr(message, "name", None) or getattr(message, "tool_name", None))
-    print(f"[DEBUG] ToolMessage names: {names[-last_n:]}")
+    # print(f"[DEBUG] ToolMessage names: {names[-last_n:]}")
+    logger.info(f"[DEBUG] ToolMessage names: {names[-last_n:]}")
 
 
 # 조건부 논리 정의 함수
@@ -171,7 +177,8 @@ def select_next_node(state: State):
     qa_types = state["question_analysis"].get("question_types", {})
 
     # 디버깅
-    print(f"[DEBUG] select_next_node - qa_types: {qa_types}")
+    # print(f"[DEBUG] select_next_node - qa_types: {qa_types}")
+    logger.info(f"[DEBUG] select_next_node - qa_types: {qa_types}")
 
     # 길찾기 인텐트(route=True)면 바로 tools 실행
     if qa_types.get("route"):

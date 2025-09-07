@@ -79,7 +79,7 @@ async def answer(req: ChatRequest):
                     continue
 
                 data = {"type": "delta", "content": content}
-                print(f"data: {data}")
+                # print(f"data: {data}")
                 yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
         except Exception as e:

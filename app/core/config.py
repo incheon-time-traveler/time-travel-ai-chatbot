@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     AI_MODEL_CONFIG: dict = {}
     
     # 로깅 설정
-    LOG_LEVEL: str = "DEBUG"
+    LOG_LEVEL: str = "ERROR"
     LOG_FILE: str = "logs/app.log"
     
     # API 키

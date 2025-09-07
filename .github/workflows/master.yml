@@ -2,7 +2,7 @@ name: CI/CD - FastAPI Docker Deploy
 
 on:
   push:
-    branches: [ master ]
+    branches: [ deploy ]
   
 jobs:
   deploy:
@@ -23,7 +23,7 @@ jobs:
             cd /home/ubuntu/time-travel-ai-chatbot
 
             echo "Pull latest code"
-            git pull origin master
+            git pull origin deploy
 
             echo "Build & Run"
             docker compose build --pull
