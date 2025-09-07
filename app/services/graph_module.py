@@ -40,7 +40,6 @@ TOOLS_RAW = [
     search_spot_tool_in_db,
     search_tool_in_web,
     open_weather_map,
-    restroom_tool,
     get_near_cafe_in_kakao,
     get_near_restaurant_in_kakao,
     search_blog,
@@ -113,19 +112,17 @@ async def chatbot(state: State):
     2. 벡터DB에서 답이 안 나오면 웹 검색을 해
     3. 맛집/카페 질문이면 카카오 API로 검색해
     4. 블로그 후기가 필요하면 카카오 블로그 검색 후 크롤링해
-    5. 화장실에 대한 질문(restroom=True)이면 restroom_tool을 사용해서 CSV에서 위치 정보를 찾아 제공해
-    6. 길찾기(route=True)면 resolve_place와 build_kakaomap_route를 순서대로 호출해서 웹 링크를 제공해
+    5. 길찾기(route=True)면 resolve_place와 build_kakaomap_route를 순서대로 호출해서 웹 링크를 제공해
        - 이동수단은 사용자 질문에서 추출한 transport_mode를 사용해 (car, foot, bicycle, publictransit)
-    7. 위치 기반 검색(맛집/카페)에서 "근처", "주변"만 있으면 현재 위치 정보를 요청하고, 구체적 위치명이 있으면 해당 위치 기반으로 검색
-    8. 질문이 명확하지 않으면 구체적으로 물어봐
+    6. 위치 기반 검색(맛집/카페)에서 "근처", "주변"만 있으면 현재 위치 정보를 요청하고, 구체적 위치명이 있으면 해당 위치 기반으로 검색
+    7. 질문이 명확하지 않으면 구체적으로 물어봐
     
     길찾기(route=True)는 최대 2번만 tool을 호출(먼저 resolve_place, 다음 build_kakaomap_route)하고 결과를 안내한 뒤 끝내.
-    화장실(restroom=True)은 1번만 tool 호출하고 결과 안내 후 끝내. 추가 tool_call 금지.
 
     맛집/카페 질문이면 반드시 적절한 도구를 호출해서 구체적인 정보를 제공해줘!
     "잠깐만 기다려줘" 같은 모호한 답변은 하지 말고, 바로 도구를 사용해서 답변해줘!
 
-    항상 친근하고 반말로 대화해줘!"""
+    항상 친근하고 반말로 오래 알던 친구처럼 대화해줘!"""
 
     if has_unresolved_tool_calls(state["messages"]):
         return {}    # 상태 변경 없이 다음 노드로
@@ -181,12 +178,7 @@ def select_next_node(state: State):
         if called_tool(state, "build_kakaomap_route"):
             return END
         return "tools"
-    
-    # 화장실 우선 처리
-    if qa_types.get("restroom"):
-        if called_tool(state, "restroom_search"):
-            return END
-        return "tools"
+
 
     # 나머지 일반 도구 선택하기
     return tools_condition(state)

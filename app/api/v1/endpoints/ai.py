@@ -8,7 +8,10 @@ from uuid import uuid4
 from app.services.ai_service import ask_ai
 from app.services.ai_service import get_or_create_graph
 from app.schemas.ai import ChatRequest, ChatResponse
+from app.core.logging import get_logger
 
+# 로거 생성
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -17,19 +20,23 @@ async def chat(req: ChatRequest):
     """
     챗봇이 답변을 한번에 제공함.
     """
+    logger.info(f"챗봇 요청 - user_id: {req.user_id}")
+
     try:
         answer = await ask_ai(req)
+        logger.info(f"챗봇 응답 완료 - user_id: {req.user_id}")
         return ChatResponse(ai_answer=answer)
     except ValueError as ve:
+        logger.warning(f"잘못된 요청 - user_id: {req.user_id}, error: {ve}")
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
+        logger.error(f"챗봇 서버 오류 - user_id: {req.user_id}, error: {e}")
         raise HTTPException(status_code=500, detail=f"챗봇 오류가 발생했습니다: {e}")
 
 @router.post("/chat")
 async def answer(req: ChatRequest):
     """
     챗봇이 답변을 stream으로 제공함.
-    - checkpoint_id : 매 요청마다 uuid4()로 부여 (동시 런 충돌 완화)
     """
     checkpoint_id = str(uuid4())
     async def event_stream():

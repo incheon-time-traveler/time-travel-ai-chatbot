@@ -3,17 +3,15 @@ import os
 import requests
 from bs4 import BeautifulSoup
 import re
+import random
 
 from app.core.config import settings
 
 from langchain.agents import Tool
 from langchain_core.tools import tool
-# from langchain.tools.retriever import create_retriever_tool
 from langchain_chroma import Chroma
-from langchain_huggingface.embeddings import HuggingFaceEmbeddings
-from langchain_community.document_loaders import CSVLoader
+from langchain_community.embeddings import SentenceTransformerEmbeddings
 from langchain_community.document_loaders import WebBaseLoader
-from langchain_community.vectorstores import FAISS
 from langchain_tavily import TavilySearch
 from langchain_community.utilities import OpenWeatherMapAPIWrapper
 
@@ -30,89 +28,37 @@ KAKAO_REST_API_KEY = settings.KAKAO_REST_API_KEY
 KAKAO_URL = settings.KAKAO_URL
 KAKAO_MAP_URL = settings.KAKAO_MAP_URL
 DB_PATH = settings.DB_PATH
-RESTROOM_CSV = settings.RESTROOM_CSV
 EMBEDDING_MODEL = settings.EMBEDDING_MODEL
-FAISS_DIR = settings.FAISS_DIR    # 화장실 정보 FAISS
 
 # Lazy Singletone 설정
-_embeddings = None
-_spot_retriever = None
-_restroom_retriever = None
+embeddings = None
+spot_retriever = None
 
 def get_embeddings():
-    global _embeddings
-    if _embeddings is None:
-        _embeddings = HuggingFaceEmbeddings(
+    global embeddings
+    if embeddings is None:
+        embeddings = SentenceTransformerEmbeddings(
             model_name=EMBEDDING_MODEL,
             model_kwargs={"device": "cpu"},
             encode_kwargs={"normalize_embeddings": True},
         )
-    return _embeddings
+    return embeddings
 
 def get_spot_retriever():
-    global _spot_retriever
-    if _spot_retriever is None:
+    global spot_retriever
+    if spot_retriever is None:
         emb = get_embeddings()
         store = Chroma(
-            collection_name="spot_db",
+            collection_name="spots_db",
             embedding_function=emb,
             persist_directory=DB_PATH,
         )
-        _spot_retriever = store.as_retriever(
+        spot_retriever = store.as_retriever(
             search_type="similarity_score_threshold",
-            search_kwargs={"score_threshold": 0.8, "k": 1},
+            search_kwargs={"score_threshold": 0.5, "k": 1},
             )
-    return _spot_retriever
+    return spot_retriever
 
-def get_restroom_retriever():
-    """FAISS는 우선 load_local, 실패 시 CSV로 빌드 후 save_local."""
-    global _restroom_retriever
-    if _restroom_retriever is None:
-        emb = get_embeddings()
-        vector = None
-        try:
-            vector = FAISS.load_local(FAISS_DIR, emb, allow_dangerous_deserialization=True)
-        except Exception as e:
-            raise RuntimeError(
-                f"Restroom FAISS index not found or incompatibale at '{FAISS_DIR}'. "
-                f"Pre-Build the index and copy both index.faiss/index.pkl. Original: {e}"
-            )
-        _restroom_retriever = vector.as_retriever(
-            search_type="similarity_score_threshold",
-            search_kwargs={"score_threshold": 0.7, "k": 3},
-        )
-    return _restroom_retriever
-
-# # 임베딩 모델 설정
-# hf_embeddings = HuggingFaceEmbeddings(
-#     model_name=EMBEDDING_MODEL,
-#     model_kwargs={"device": "cpu"},
-#     encode_kwargs={"normalize_embeddings": True}
-# )
-
-# # 저장된 벡터 db 불러오기
-# try:
-#     spots_store = Chroma(
-#         collection_name="spot_db",
-#         embedding_function=hf_embeddings,
-#         persist_directory=DB_PATH
-#     )
-    
-#     # retriever 설정
-#     spot_retriever = spots_store.as_retriever(
-#         search_type="similarity_score_threshold",
-#         search_kwargs={"score_threshold": 0.8,    # 임계값 설정
-#                        "k": 1},
-#     )
-
-#     search_spot_tool_in_db = create_retriever_tool(
-#         spot_retriever,
-#         name="vectordb_search",
-#         description="Use this tool to search information about Incheon's tour spots from the vector database."
-#     )
-# except Exception as e:
-#     print(f"벡터DB 로딩 실패: {e}")
-#     search_spot_tool_in_db = None
 
 # ===============[Tool]============================
 
@@ -127,7 +73,6 @@ def analyze_user_question(user_question: str, user_lat: str = None, user_lon: st
         "cafe": False,         # 카페 관련
         "location": False,     # 위치 관련
         "weather": False,      # 날씨 관련
-        "restroom": False,     # 화장실 관련
         "blog_review": False,  # 블로그 후기 관련
         "route": False,        # 길찾기 관련
         "clarification_needed": False  # 질문 명확화 필요
@@ -153,6 +98,7 @@ def analyze_user_question(user_question: str, user_lat: str = None, user_lon: st
             extracted_info["latitude"] = float(user_lat)
             extracted_info["longitude"] = float(user_lon)
             extracted_info["has_coordinates"] = True
+
         except ValueError:
             # GPS 좌표 변환 실패 시 무시
             pass
@@ -186,7 +132,9 @@ def analyze_user_question(user_question: str, user_lat: str = None, user_lon: st
             for pattern in location_patterns:
                 match = re.search(pattern, user_question)
                 if match:
-                    extracted_info["location"] = match.group(1)
+                    # 구체적인 장소명이 있으면 query를 해당 장소명으로, location은 None으로 설정
+                    extracted_info["query"] = match.group(1)
+                    extracted_info["location"] = None
                     extracted_info["location_type"] = "specific_place"  # 특정 장소
                     location_found = True
                     break
@@ -233,7 +181,9 @@ def analyze_user_question(user_question: str, user_lat: str = None, user_lon: st
             for pattern in location_patterns:
                 match = re.search(pattern, user_question)
                 if match:
-                    extracted_info["location"] = match.group(1)
+                    # 구체적인 장소명이 있으면 query를 해당 장소명으로, location은 None으로 설정
+                    extracted_info["query"] = match.group(1)
+                    extracted_info["location"] = None
                     extracted_info["location_type"] = "specific_place"  # 특정 장소
                     location_found = True
                     break
@@ -266,11 +216,7 @@ def analyze_user_question(user_question: str, user_lat: str = None, user_lon: st
         location_match = re.search(r"([가-힣]+)\s*날씨", user_question)
         if location_match:
             extracted_info["location"] = location_match.group(1)
-    
-    # 화장실 관련 질문 확인
-    if "화장실" in question_lower:
-        question_types["restroom"] = True
-        extracted_info["query"] = user_question
+
     
     # 블로그 후기 관련 질문 확인
     if any(keyword in question_lower for keyword in ["후기", "리뷰", "블로그", "평가", "어떤가"]):
@@ -347,43 +293,7 @@ open_weather_map = Tool(
     description="Use this tool to search weather information for a given location."
 )
 
-# 공공화장실
-@tool("restroom_search")
-def restroom_tool(query: str) -> list:
-    """Use this tool to search the restroom information from CSV loader."""
-    retriever = get_restroom_retriever()
-    docs = retriever.get_relevant_documents(query)
-    return [
-        {
-            "content": d.page_content,
-            "metadata": getattr(d, "metadata", {}),
-        }
-        for d in docs
-    ]
 
-# # 4. 공공화장실
-# loader = CSVLoader(
-#     file_path=RESTROOM_CSV,
-#     source_column="summary",
-#     metadata_columns=["name", "address", "mapx", "mapy"],
-#     encoding="utf-8",
-# )
-
-# restroom_data = loader.load()
-
-# vector = FAISS.from_documents(restroom_data, hf_embeddings)
-
-# restroom_retriever = vector.as_retriever(
-#     search_type="similarity_score_threshold",
-#     search_kwargs={"score_threshold": 0.7,    # 임계값 설정
-#                    "k": 3},
-# )
-
-# restroom_tool = create_retriever_tool(
-#     restroom_retriever,
-#     name="restroom_search",    # 도구 이름 입력
-#     description="Use this tool to search the restroom information from CSV loader.",
-# )
 
 # 5. 카페 추천 tool
 @tool
@@ -399,6 +309,9 @@ def get_near_cafe_in_kakao(query: str, location: str = None, latitude: str = Non
     search_query = query
     if location:
         search_query = f"{location} {query}"
+    else:
+        # location이 없으면 인천으로 고정
+        search_query = f"인천 {query}"
     
     params = {
         "query": search_query,
@@ -440,6 +353,9 @@ def get_near_cafe_in_kakao(query: str, location: str = None, latitude: str = Non
     else:
         print(f"HTTP 요청 실패. 응답 코드: {response.status_code}")
 
+    if len(spots) > 3:
+        spots = random.sample(spots, 3)
+
     return spots
 
 # 6. 맛집 추천 tool
@@ -456,6 +372,9 @@ def get_near_restaurant_in_kakao(query: str, location: str = None, latitude: str
     search_query = query
     if location:
         search_query = f"{location} {query}"
+    else:
+        # location이 없으면 인천으로 고정
+        search_query = f"인천 {query}"
     
     params = {
         "query": search_query,
@@ -496,6 +415,9 @@ def get_near_restaurant_in_kakao(query: str, location: str = None, latitude: str
             spots.append(info)
     else:
         print(f"HTTP 요청 실패. 응답 코드: {response.status_code}")
+
+    if len(spots) > 3:
+        spots = random.sample(spots, 3)
 
     return spots
 
