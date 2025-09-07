@@ -5,7 +5,6 @@ from langchain_core.messages import HumanMessage
 
 from app.services.graph_module import make_graph  # 내부 그래프 빌더
 from app.schemas.ai import ChatRequest
-
 from app.core.logging import get_logger
 
 # 로거 생성
