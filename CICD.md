@@ -20,7 +20,7 @@
 
 - docker, docker-compose 설치
 
-```
+```bash
 # Docker 설치
 # 1. 프로그램 설치 전 우분투 시스템 패키지 업데이트
 $ sudo apt-get update
@@ -58,6 +58,24 @@ sudo docker compose build && docker compose up -d
 
 sudo docker compose ps
 
+sudo docker compose logs -f
+```
+
+```bash
+# 스택 정리(볼륨 보존)
+sudo docker compose down --remove-orphans
+
+# 미사용 리소스 정리
+sudo docker system prune -a --volumes -f
+sudo docker builder prune -a -f
+
+# 최신 이미지/의존성 반영 + 캐시없이 재빌드
+sudo docker compose pull
+sudo docker compose build --no-cache --pull
+
+# 재기동 및 로그 확인
+sudo docker compose up -d
+sudo docker compose ps
 sudo docker compose logs -f
 ```
 

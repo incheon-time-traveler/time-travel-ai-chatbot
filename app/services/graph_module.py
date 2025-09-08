@@ -75,7 +75,7 @@ async def analyze_question_node(state: State):
         
         # 메시지에 GPS 정보가 포함되어 있는지 확인
         if hasattr(last_message, 'additional_kwargs') and last_message.additional_kwargs:
-            user_lat = last_message.additional_kwargs.get('user_lat')
+            user_lat = last_message.additional_kwargs.get('user_lat') 
             user_lon = last_message.additional_kwargs.get('user_lon')
         
         # 질문 분석 실행 (GPS 좌표 포함)
@@ -124,6 +124,7 @@ async def chatbot(state: State):
 
     맛집/카페 질문이면 반드시 적절한 도구를 호출해서 구체적인 정보를 제공해줘!
     "잠깐만 기다려줘" 같은 모호한 답변은 하지 말고, 바로 도구를 사용해서 답변해줘!
+    사용자의 질문을 그대로 반복하지 말고, 반드시 새로운 답변을 제공해줘!
 
     항상 친근하고 반말로 오래 알던 친구처럼 대화해줘!"""
 
