@@ -2,7 +2,7 @@ name: CI/CD - FastAPI Docker Deploy
 
 on:
   push:
-    branches: [ master ]
+    branches: [ deploy ]
   
 jobs:
   deploy:
@@ -23,15 +23,15 @@ jobs:
             cd /home/ubuntu/time-travel-ai-chatbot
 
             echo "Pull latest code"
-            git pull origin master
+            git pull origin deploy
 
             echo "Build & Run"
-            docker compose build --pull
-            docker compose up -d
+            sudo docker compose build --pull
+            sudo docker compose up -d
 
             echo "Health check"
             sleep 3
-            docker compose ps
+            sudo docker compose ps
 
             # 내부 헬스엔드포인트가 있으면:
             ATTEMPTS=5
@@ -43,8 +43,8 @@ jobs:
 
             if [ $ATTEMPTS -le 0 ]; then
               echo "❌ health check failed"
-              docker compose ps
-              docker compose logs --tail=200
+              sudo docker compose ps
+              sudo docker compose logs --tail=200
               exit 1
             fi
             

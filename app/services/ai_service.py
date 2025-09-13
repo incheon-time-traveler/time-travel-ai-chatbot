@@ -1,7 +1,8 @@
 # app/services/ai_service.py
 import asyncio
+from datetime import datetime, timezone, timedelta
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.services.graph_module import make_graph  # 내부 그래프 빌더
 from app.schemas.ai import ChatRequest
@@ -9,6 +10,9 @@ from app.core.logging import get_logger
 
 # 로거 생성
 logger = get_logger(__name__)
+
+# 한국 시간
+KST = timezone(timedelta(hours=9))
 
 _graph = None
 _graph_lock = asyncio.Lock()
@@ -38,15 +42,37 @@ async def ask_ai(req: ChatRequest) -> str:
         new_message = HumanMessage(
             content=req.user_question,
             additional_kwargs={
-                "user_lat": req.user_location.lat,
-                "user_lon": req.user_location.lng
+                "user_lat": req.user_location.lat if req.user_location else None,
+                "user_lon": req.user_location.lng if req.user_location else None
             }
         )
 
+        # 사용자 정보 받기
+        if req.user_info:
+            info_message = f"""
+            [사용자 정보]
+            사용자의 닉네임: {req.user_info.nickname}
+            성별: {req.user_info.gender}
+            나이대: {req.user_info.age_group}
+
+            사용자 정보를 참고해서 친근감있게 반말로 답변해주세요.
+            """
+        else:
+            info_message = "친근감있게 반말로 답변을 제공해주세요."
+
+        system_message = SystemMessage(
+            content=f"""
+            오늘이나 현재 같은 표현 쓰면 아래의 현재 시간을 참고하세요.
+            - 현재 시간: {datetime.now(KST).strftime('%Y-%m-%d %H:%M:%S')}
+
+            {info_message}
+            """
+        )
+
         # 메시지에 GPS를 실어 보내고 싶다면 additional_kwargs를 활용하도록
-        # 여기서는 최소 이식: content만 전달
+        # 여기서는 최소: content만 전달
         result = await graph.ainvoke(
-            {"messages": [new_message]},
+            {"messages": [system_message, new_message]},
             config=config
         )
 

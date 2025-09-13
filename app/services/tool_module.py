@@ -6,6 +6,7 @@ import re
 import random
 
 from app.core.config import settings
+from app.core.logging import get_logger
 
 from langchain.agents import Tool
 from langchain_core.tools import tool
@@ -15,6 +16,8 @@ from langchain_community.document_loaders import WebBaseLoader
 from langchain_tavily import TavilySearch
 from langchain_community.utilities import OpenWeatherMapAPIWrapper
 
+# 로거 설정
+logger = get_logger(__name__)
 
 # 환경 변수 설정
 os.environ["HF_TOKEN"] = settings.HUGGINGFACE_API_KEY
@@ -351,7 +354,9 @@ def get_near_cafe_in_kakao(query: str, location: str = None, latitude: str = Non
             }
             spots.append(info)
     else:
-        print(f"HTTP 요청 실패. 응답 코드: {response.status_code}")
+        logger.error(f"HTTP 요청 실패. 응답 코드: {response.status_code}")
+        # print(f"HTTP 요청 실패. 응답 코드: {response.status_code}")
+        raise Exception(f"HTTP 요청 실패. 응답 코드: {response.status_code}")
 
     if len(spots) > 3:
         spots = random.sample(spots, 3)
@@ -414,7 +419,9 @@ def get_near_restaurant_in_kakao(query: str, location: str = None, latitude: str
             }
             spots.append(info)
     else:
-        print(f"HTTP 요청 실패. 응답 코드: {response.status_code}")
+        # print(f"HTTP 요청 실패. 응답 코드: {response.status_code}")
+        logger.error(f"HTTP 요청 실패. 응답 코드: {response.status_code}")
+        raise Exception(f"HTTP 요청 실패. 응답 코드: {response.status_code}")
 
     if len(spots) > 3:
         spots = random.sample(spots, 3)
@@ -454,7 +461,9 @@ def search_blog(query: str) -> list:
             blog_list.append(info)
 
     else:
-        print(f"HTTP 요청 실패. 응답 코드: {response.status_code}")
+        # print(f"HTTP 요청 실패. 응답 코드: {response.status_code}")
+        logger.error(f"HTTP 요청 실패. 응답 코드: {response.status_code}")
+        raise Exception(f"HTTP 요청 실패. 응답 코드: {response.status_code}")
 
     return blog_list
 

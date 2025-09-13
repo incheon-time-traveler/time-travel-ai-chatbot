@@ -50,8 +50,8 @@ async def answer(req: ChatRequest):
                             "role": "user",
                             "content": req.user_question,
                             "additional_kwargs": {
-                                "user_lat": req.user_location.lat,
-                                "user_lon": req.user_location.lng
+                                "user_lat": req.user_location.lat if req.user_location else None,
+                                "user_lon": req.user_location.lng if req.user_location else None
                             }
                         }
                     ]
@@ -79,7 +79,7 @@ async def answer(req: ChatRequest):
                     continue
 
                 data = {"type": "delta", "content": content}
-                print(f"data: {data}")
+                # print(f"data: {data}")
                 yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
         except Exception as e:
