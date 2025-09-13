@@ -21,19 +21,19 @@ async def delete_memory(
         # delete_thread 함수 내부에서 이미 락을 사용한다. (이중 락킹 방지지)
         deleted = await delete_thread(thread_id)
         logger.info(f"메모리 삭제 완료 (일반모드): {deleted}행 삭제")
-        return {"thread_id": thread_id, "deleted_rows": deleted}
+        return {"thread_id": thread_id, "deleted_rows": deleted, "complete": True}
     
     if await try_acquire_thread(thread_id, timeout=10):
         try:
             deleted = await delete_thread(thread_id)
             logger.info(f"메모리 삭제 완료 (강제모드): {deleted}행 삭제")
-            return {"thread_id": thread_id, "deleted_rows": deleted, "forced":True}
+            return {"thread_id": thread_id, "deleted_rows": deleted, "forced":True, "complete": True}
         finally:
             release_thread(thread_id)
     else:
         # 락 획득 실패 시 적절한 에러 응답 반환
         logger.error(f"락 획득 실패: {thread_id}")
-        return {"thread_id": thread_id, "error": "락 획득 실패", "forced":False}
+        return {"thread_id": thread_id, "error": "락 획득 실패", "forced":False, "complete": False}
     
 
 @router.get("/exists")

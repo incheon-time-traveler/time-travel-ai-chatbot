@@ -7,7 +7,7 @@
 - t2.micro & 30GB 선택
 - pem 키 생성
 - 인바운드 그룹 생성
-    - 사용자 TCP 설정정
+    - 사용자 TCP 설정
 
 ## Docker
 

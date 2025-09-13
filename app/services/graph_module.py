@@ -9,7 +9,7 @@ from app.services.tool_module import *
 
 from langchain_openai import ChatOpenAI
 from langchain_upstage import ChatUpstage
-from langchain_core.messages import AIMessage, ToolMessage, HumanMessage
+from langchain_core.messages import AIMessage, ToolMessage, HumanMessage, SystemMessage
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -105,43 +105,103 @@ def has_unresolved_tool_calls(messages: list) -> bool:
             return True
     return False
 
+import uuid
+
+FILTER_PATTERNS = [
+    "잠깐만", "기다려", "찾아볼게", "검색해볼게", "확인해볼게", "살펴볼게"
+]
+
+# 특정 단어 필터링
+def is_filter(text: str) -> bool:
+    t = (text or "").lower()
+    return any(re.search(p, t) for p in FILTER_PATTERNS)
+
+# 도구 호출 메시지를 수동으로 만드는 함수
+def custom_tool_call(name, args):
+    return {
+        "id": str(uuid.uuid4()),
+        "name": name,           # 실행할 도구 이름 (ex. get_near_restaurant_in_kakao)
+        "args": args,           # 도구에 전달한 인자들 (ex. {"query": "맛집", "location": "소래포구"})
+        "type": "tool_call"     # 메시지 타입 명시적 지정
+    }
+
+def make_forced_tool_ai_message(state: State) -> AIMessage | None:
+    question_analysis = state.get("question_analysis") or {}
+    types = question_analysis.get("question_types") or {}
+    info = question_analysis.get("extracted_info") or {}
+
+    # 1) 맛집 카페
+    if types.get("restaurant") or types.get("cafe"):
+        tool = "get_near_restaurant_in_kakao" if types.get("restaurant") else "get_near_cafe_in_kakao"
+        args = {"query": "맛집" if types.get("restaurant") else "카페"}
+
+        # 위치/좌표 인자 세팅
+        if info.get("location_type") == "specific_place" and info.get("query"):
+            args["location"] = info["query"]
+        
+        if info.get("has_coordinates"):
+            args["latitude"] = str(info.get("latitude"))
+            args["longitude"] = str(info.get("longitude"))
+
+        return AIMessage(content="", tool_calls=[custom_tool_call(tool, args)])
+    
+    # 2) 근처/주변 인데 좌표 없음 -> 통합 도구 1회
+    if (types.get("restaurant") or types.get("cafe")) and info.get("needs_current_location"):
+        tool = "search_restaurants_by_location" if types.get("restaurant") else "search_cafes_by_location"
+        # 원래 질문을 그대로 넘겨서 내부 파서가 좌표/장소명을 추출한다.
+        question = question_analysis.get("original_question") or ""
+        return AIMessage(content="", tool_calls=[custom_tool_call(tool, {"user_input": question})])
+    
+    # 3) 길찾기는 기존 라우팅 사용함.
+    return None
+
+
 # 챗봇 함수 정의 - 인천 토박이 친구 페르소나 적용
 async def chatbot(state: State):
     # 시스템 메시지에 페르소나 설정
-    system_message = """너는 인천 토박이인 사용자와 아주 친한 친구야! 반말과 친근감 있는 말투로 대화해줘.
+    system_message = SystemMessage(
+        content=f"""너는 인천 토박이이고 사용자와 아주 친한 친구야.
     
-    사용자의 질문을 분석해서 적절한 도구를 사용해서 답변해줘:
-    1. 인천 관광지 관련 질문이면 벡터DB를 먼저 검색해
-    2. 벡터DB에서 답이 안 나오면 웹 검색을 해
-    3. 맛집/카페 질문이면 카카오 API로 검색해
-    4. 블로그 후기가 필요하면 카카오 블로그 검색 후 크롤링해
-    5. 길찾기(route=True)면 resolve_place와 build_kakaomap_route를 순서대로 호출해서 웹 링크를 제공해
-       - 이동수단은 사용자 질문에서 추출한 transport_mode를 사용해 (car, foot, bicycle, publictransit)
-    6. 위치 기반 검색(맛집/카페)에서 "근처", "주변"만 있으면 현재 위치 정보를 요청하고, 구체적 위치명이 있으면 해당 위치 기반으로 검색
-    7. 질문이 명확하지 않으면 구체적으로 물어봐
-    
-    길찾기(route=True)는 최대 2번만 tool을 호출(먼저 resolve_place, 다음 build_kakaomap_route)하고 결과를 안내한 뒤 끝내.
+        사용자의 질문을 분석해서 적절한 도구를 사용해서 답변해줘:
+        1. 인천 관광지 관련 질문이면 벡터DB를 먼저 검색해
+        2. 벡터DB에서 답이 안 나오면 웹 검색을 해
+        3. 맛집/카페 질문이면 카카오 API로 검색해
+        4. 블로그 후기가 필요하면 카카오 블로그 검색 후 크롤링해
+        5. 길찾기(route=True)면 resolve_place와 build_kakaomap_route를 순서대로 호출해서 웹 링크를 제공해
+        - 이동수단은 사용자 질문에서 추출한 transport_mode를 사용해 (car, foot, bicycle, publictransit)
+        6. 위치 기반 검색(맛집/카페)에서 "근처", "주변"만 있으면 현재 위치 정보를 요청하고, 구체적 위치명이 있으면 해당 위치 기반으로 검색
+        7. 질문이 명확하지 않으면 구체적으로 물어봐
+        
+        길찾기(route=True)는 최대 2번만 tool을 호출(먼저 resolve_place, 다음 build_kakaomap_route)하고 결과를 안내한 뒤 끝내.
 
-    맛집/카페 질문이면 반드시 적절한 도구를 호출해서 구체적인 정보를 제공해줘!
-    "잠깐만 기다려줘" 같은 모호한 답변은 하지 말고, 바로 도구를 사용해서 답변해줘!
-    사용자의 질문을 그대로 반복하지 말고, 반드시 새로운 답변을 제공해줘!
+        맛집/카페 질문이면 반드시 적절한 도구를 호출해서 구체적인 정보를 제공해줘.
+        "잠깐만 기다려줘" 같은 모호한 답변은 하지 말고, 바로 도구를 사용해서 답변해줘.
+        사용자의 질문을 그대로 반복하지 말고, 반드시 새로운 답변을 제공해줘.
 
-    항상 친근하고 반말로 오래 알던 친구처럼 대화해줘!"""
+        항상 친근하고 반말로 오래 알던 친구처럼 대화해줘."""
+    )
 
     if has_unresolved_tool_calls(state["messages"]):
         return {}    # 상태 변경 없이 다음 노드로
     
     # 시스템 메시지 추가
-    messages_with_system = [{"role": "system", "content": system_message}] + state["messages"]
+    messages_with_system = [system_message] + state["messages"]
     
     response = await llm_with_tools.ainvoke(messages_with_system)
 
-    # 디버깅
-    # print(f"[DEBUG] LLM 응답: {response}")
-    logger.info(f"[DEBUG] LLM 응답: {response}")
-    if hasattr(response, 'tool_calls') and response.tool_calls:
-        # print(f"[DEBUG] 도구 호출 감지: {response.tool_calls}")
-        logger.info(f"[DEBUG] 도구 호출 감지: {response.tool_calls}")
+    # # 디버깅
+    # # print(f"[DEBUG] LLM 응답: {response}")
+    # logger.info(f"[DEBUG] LLM 응답: {response}")
+    # if hasattr(response, 'tool_calls') and response.tool_calls:
+    #     # print(f"[DEBUG] 도구 호출 감지: {response.tool_calls}")
+    #     logger.info(f"[DEBUG] 도구 호출 감지: {response.tool_calls}")
+
+    # [Fallback] tool_calls가 없고, 답변이 필러 멘트이면 -> 강제 tool call 1회
+    if (not getattr(response, "tool_calls", None)) and is_filter(getattr(response, "content", "")):
+        forced = make_forced_tool_ai_message(state)
+        if forced is not None:
+            # 여기서 바로 ToolNode가 실행될 수 있도록 AIMessage(tool_calls=_)를 반환
+            return {"messages": [forced]}
 
     # 메시지 호출 및 반환
     return {"messages": [response]}
