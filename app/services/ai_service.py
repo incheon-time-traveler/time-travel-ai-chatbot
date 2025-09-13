@@ -47,15 +47,30 @@ async def ask_ai(req: ChatRequest) -> str:
             }
         )
 
+        # 사용자 정보 받기
+        if req.user_info:
+            info_message = f"""
+            [사용자 정보]
+            사용자의 닉네임: {req.user_info.nickname}
+            성별: {req.user_info.gender}
+            나이대: {req.user_info.age_group}
+
+            사용자 정보를 참고해서 친근감있게 반말로 답변해주세요.
+            """
+        else:
+            info_message = "친근감있게 반말로 답변을 제공해주세요."
+
         system_message = SystemMessage(
             content=f"""
             오늘이나 현재 같은 표현 쓰면 아래의 현재 시간을 참고하세요.
             - 현재 시간: {datetime.now(KST).strftime('%Y-%m-%d %H:%M:%S')}
+
+            {info_message}
             """
         )
 
         # 메시지에 GPS를 실어 보내고 싶다면 additional_kwargs를 활용하도록
-        # 여기서는 최소 이식: content만 전달
+        # 여기서는 최소: content만 전달
         result = await graph.ainvoke(
             {"messages": [system_message, new_message]},
             config=config
