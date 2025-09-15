@@ -12,7 +12,7 @@ router = APIRouter()
 
 @router.delete("")
 async def delete_memory(
-    thread_id: str,
+    thread_id: int,
     force: bool = Query(False, description="실행 중이어도 강제 종료 후 삭제")
 ):
     logger.info(f"DELETE /memory API 호출: thread_id={thread_id}, force={force}")
@@ -37,7 +37,7 @@ async def delete_memory(
     
 
 @router.get("/exists")
-async def thread_exists(thread_id: str):
+async def thread_exists(thread_id: int):
     """
     해당 thread_id가 DB 어딘가에 존재하는지 여부만 반환
     """
@@ -48,7 +48,7 @@ async def thread_exists(thread_id: str):
 
 
 @router.get("/locations")
-async def thread_locations(thread_id: str):
+async def thread_locations(thread_id: int):
     """
     thread_id가 들어있는 테이블과 건수 목록
     예: {"locations":[{"table":"checkpoints","count":3}, ...]}

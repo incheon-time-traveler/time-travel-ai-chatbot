@@ -26,12 +26,12 @@ jobs:
             git pull origin deploy
 
             echo "Build & Run"
-            sudo docker compose build --pull
-            sudo docker compose up -d
+            docker compose build
+            docker compose up -d
 
             echo "Health check"
             sleep 3
-            sudo docker compose ps
+            docker compose ps
 
             # 내부 헬스엔드포인트가 있으면:
             ATTEMPTS=5
@@ -43,8 +43,8 @@ jobs:
 
             if [ $ATTEMPTS -le 0 ]; then
               echo "❌ health check failed"
-              sudo docker compose ps
-              sudo docker compose logs --tail=200
+              docker compose ps
+              docker compose logs --tail=200
               exit 1
             fi
             
