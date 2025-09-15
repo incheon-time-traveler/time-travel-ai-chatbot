@@ -7,7 +7,7 @@ ENV PYTHONUNBUFFERED 1
 WORKDIR /chatbot
 
 COPY requirements.txt .
-RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # 애플리케이션 전체 복사
 COPY app /chatbot/app

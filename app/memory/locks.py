@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 # 단일 워커 (프로세스) 전제에서, 키별 asyncio.Lock을 보관하는 저장소
 lock_store: Dict[str, asyncio.Lock] = {}
 
-def thread_key(thread_id: str) -> str:
+def thread_key(thread_id: int) -> str:
     """내부 저장소에서 사용할 네임스페이스가 붙은 키"""
     if not thread_id:
         raise ValueError("thread_id required")
@@ -30,7 +30,7 @@ def get_lock(key: str) -> asyncio.Lock:
 
 
 @asynccontextmanager
-async def thread_lock(thread_id: str) -> AsyncIterator[None]:
+async def thread_lock(thread_id: int) -> AsyncIterator[None]:
     """
     동일 thread_id의 동시 실행을 1개로 제한(직렬화)하는 컨텍스트 매니저.
     사용 예:
@@ -52,7 +52,7 @@ async def thread_lock(thread_id: str) -> AsyncIterator[None]:
         logger.debug(f"락 해제: {thread_id}")
 
 
-async def try_acquire_thread(thread_id: str, timeout: Optional[float] = None) -> bool:
+async def try_acquire_thread(thread_id: int, timeout: Optional[float] = None) -> bool:
     """
     thread_id 락을 시도해서 획득.
     - timeout is None 또는 0 : 즉시 시도(논 블로킹). 이미 잠겨있으면 False.
@@ -81,7 +81,7 @@ async def try_acquire_thread(thread_id: str, timeout: Optional[float] = None) ->
         return False
     
 
-def release_thread(thread_id: str) -> None:
+def release_thread(thread_id: int) -> None:
     """
     try_acquire_thread로 획득한 락을 해제.
     주의: 락의 소유 태스크에서만 호출해야 함.

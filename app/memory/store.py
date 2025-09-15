@@ -63,7 +63,7 @@ def is_safe_table_name(table_name: str) -> bool:
 
 # API 함수
 
-async def delete_thread(thread_id: str) -> int:
+async def delete_thread(thread_id: int) -> int:
     """
     지정 thread_id 관련 레코드를 모든 테이블에서 삭제.
     반환: 삭제된 행 수의 합(대략치).
@@ -111,7 +111,7 @@ async def delete_thread(thread_id: str) -> int:
     return deleted_total
 
 
-async def has_thread(thread_id: str) -> bool:
+async def has_thread(thread_id: int) -> bool:
     """
     주어진 thread_id가 DB 어딘가에 '존재'하는지만 빠르게 확인.
     """
@@ -137,7 +137,7 @@ async def has_thread(thread_id: str) -> bool:
     return False
 
 
-async def find_thread(thread_id: str) -> List[Tuple[str, int]]:
+async def find_thread(thread_id: int) -> List[Tuple[str, int]]:
     """
     thread_id가 들어있는 테이블과 건수를 반환.
     예: [("checkpoints", 3), ("writes", 9)]
