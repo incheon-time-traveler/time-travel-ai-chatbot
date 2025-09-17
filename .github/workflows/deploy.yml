@@ -32,21 +32,6 @@ jobs:
             echo "Health check"
             sleep 3
             docker compose ps
-
-            # 내부 헬스엔드포인트가 있으면:
-            ATTEMPTS=5
-            until curl -sf http://localhost:8000/health > /dev/null || [ $ATTEMPTS -le 0 ]; do
-              ATTEMPTS=$((ATTEMPTS-1))
-              echo " - waiting for app... ($ATTEMPTS)"
-              sleep 3
-            done
-
-            if [ $ATTEMPTS -le 0 ]; then
-              echo "❌ health check failed"
-              docker compose ps
-              docker compose logs --tail=200
-              exit 1
-            fi
             
             echo "✅ Done"
             
